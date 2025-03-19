@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: fritter_ledger
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password1234
+    ports:
+      - "5433:5432"  # Changed from 5432:5432
+    volumes:
+      - fritter_data:/var/lib/postgresql/data
+
+volumes:
+  fritter_data:
