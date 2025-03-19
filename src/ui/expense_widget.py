@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 from PIL import Image
 import io
+from .components.card_table import CardTable
 
 class ExpenseWidget(QWidget):
     def __init__(self, parent=None):
@@ -88,6 +89,12 @@ class ExpenseWidget(QWidget):
         form_frame.setFrameStyle(QFrame.Shape.StyledPanel)
         
         main_layout.addWidget(form_frame)
+        
+        # Add card table
+        self.expense_table = CardTable()
+        main_layout.addWidget(QLabel("Recent Expenses"))
+        main_layout.addWidget(self.expense_table)
+        
         self.setLayout(main_layout)
 
     def upload_receipt(self):
@@ -128,6 +135,9 @@ class ExpenseWidget(QWidget):
                 'date': date,
                 'receipt': self.receipt_data
             }
+            
+            # Add card to table
+            self.expense_table.add_card(expense_data)
             
             # Clear form after successful addition
             self.clear_form()

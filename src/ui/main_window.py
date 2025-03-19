@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget
 from .expense_widget import ExpenseWidget
 from .income_widget import IncomeWidget
 from .subscription_widget import SubscriptionWidget
+from .receipt_manager import ReceiptManager
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -19,6 +20,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(ExpenseWidget(), "Expenses")
         tabs.addTab(IncomeWidget(), "Income")
         tabs.addTab(SubscriptionWidget(), "Subscriptions")
+        tabs.addTab(ReceiptManager(), "Receipts")
         
         layout.addWidget(tabs)
         
