@@ -8,12 +8,7 @@
     --text-light: #ffffff;
 }
 
-QMainWindow {
-    background-color: #2b2b2b;
-    color: #ffffff;
-}
-
-QWidget {
+QMainWindow, QWidget {
     background-color: #2b2b2b;
     color: #ffffff;
 }
@@ -28,6 +23,7 @@ QTabBar::tab {
     color: #ffffff;
     padding: 8px 20px;
     border: none;
+    min-width: 100px;
 }
 
 QTabBar::tab:selected {
@@ -40,14 +36,19 @@ QPushButton {
     border: none;
     padding: 8px 16px;
     border-radius: 4px;
+    min-width: 80px;
 }
 
 QPushButton:hover {
     background-color: #534bae;
 }
 
-QPushButton.success {
+QPushButton[class="success"] {
     background-color: #4CAF50;
+}
+
+QPushButton[class="success"]:hover {
+    background-color: #45a049;
 }
 
 QLineEdit, QTextEdit, QComboBox, QDateEdit {
@@ -67,14 +68,22 @@ QFrame {
 
 QScrollArea {
     border: none;
-    background-color: #2b2b2b;
+    background-color: transparent;
 }
 
 QLabel {
     color: #ffffff;
+    padding: 2px;
 }
 
-Card {
+QLabel[class="section-title"] {
+    font-weight: bold;
+    font-size: 14px;
+    color: #ffffff;
+    padding: 10px 5px;
+}
+
+QWidget[class="card"] {
     background-color: #3a3a3a;
     border-radius: 8px;
     padding: 10px;
@@ -82,11 +91,27 @@ Card {
     border: 1px solid #1a237e;
 }
 
-Card QLabel {
+QWidget[class="card"] QLabel {
     color: #ffffff;
 }
 
-Card QLabel[class="title"] {
+QWidget[class="card"] QLabel[class="title"] {
     font-weight: bold;
     color: #534bae;
+}
+
+QComboBox::drop-down {
+    border: none;
+    background-color: #1a237e;
+    width: 25px;
+}
+
+QComboBox::down-arrow {
+    background-color: #ffffff;
+}
+
+QDateEdit::drop-down {
+    border: none;
+    background-color: #1a237e;
+    width: 25px;
 }

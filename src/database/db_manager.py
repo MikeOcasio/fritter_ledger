@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.exc import SQLAlchemyError
 from ..models.base import Base
 import configparser
@@ -16,7 +16,8 @@ class DatabaseManager:
         db_url = f"postgresql://{config['Database']['user']}:{config['Database']['password']}@{config['Database']['host']}:{config['Database']['port']}/{config['Database']['dbname']}"
         
         self.engine = create_engine(db_url)
-        self.Session = sessionmaker(bind=self.engine)
+        self.session_factory = sessionmaker(bind=self.engine)
+        self.Session = scoped_session(self.session_factory)
         
     def init_db(self):
         Base.metadata.create_all(self.engine)

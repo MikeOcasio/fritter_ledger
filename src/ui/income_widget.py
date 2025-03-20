@@ -2,13 +2,16 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QLineEdit, QPushButton, QDateEdit, QFrame)
 from PyQt6.QtCore import Qt, QDate
 from ..models.income import Income
+from ..database.db_manager import DatabaseManager
 from .components.card_table import CardTable
 from datetime import datetime
 
 class IncomeWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.db_manager = DatabaseManager()
         self.init_ui()
+        self.load_income()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -62,23 +65,37 @@ class IncomeWidget(QWidget):
 
         self.setLayout(main_layout)
 
+    def load_income(self):
+        session = self.db_manager.get_session()
+        try:
+            incomes = session.query(Income).all()
+            for income in incomes:
+                self.add_income_card(income)
+        finally:
+            session.close()
+
     def add_income(self):
         try:
-            income_data = {
-                'amount': float(self.amount_input.text()),
-                'source': self.source_input.text(),
-                'date': self.date_input.date().toPyDate()
-            }
+            income = Income(
+                amount=float(self.amount_input.text()),
+                source=self.source_input.text(),
+                date=self.date_input.date().toPyDate()
+            )
             
-            # Add to card table
-            self.income_table.add_card(income_data)
-            
-            # Clear form
-            self.clear_form()
+            if self.db_manager.add_record(income):
+                self.add_income_card(income)
+                self.clear_form()
             
         except ValueError:
             self.amount_input.setStyleSheet("border: 1px solid red;")
             return
+
+    def add_income_card(self, income):
+        self.income_table.add_card({
+            'Amount': f"${income.amount:.2f}",
+            'Source': income.source,
+            'Date': income.date.strftime("%Y-%m-%d")
+        })
 
     def clear_form(self):
         self.amount_input.clear()

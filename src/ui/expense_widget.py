@@ -1,24 +1,26 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                           QLineEdit, QPushButton, QFileDialog, QDateEdit,
-                           QComboBox, QScrollArea, QFrame)
+                           QLineEdit, QPushButton, QDateEdit,
+                           QComboBox, QFrame)
 from PyQt6.QtCore import Qt, QDate
 from datetime import datetime
-import os
-from PIL import Image
-import io
 from .components.card_table import CardTable
+from ..models.expense import Expense
+from ..database.db_manager import DatabaseManager
 
 class ExpenseWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.db_manager = DatabaseManager()
         self.init_ui()
-        self.receipt_data = None
+        self.load_expenses()
+        self.receipt_reference = None
 
     def init_ui(self):
         main_layout = QVBoxLayout()
         
-        # Input form section
-        form_layout = QVBoxLayout()
+        # Form section
+        form_frame = QFrame()
+        form_layout = QVBoxLayout(form_frame)
         
         # Amount input
         amount_layout = QHBoxLayout()
@@ -41,12 +43,11 @@ class ExpenseWidget(QWidget):
         self.cat_label = QLabel("Category:")
         self.cat_input = QComboBox()
         self.cat_input.addItems([
-            "Food & Dining",
+            "Software",
             "Transportation",
             "Utilities",
-            "Entertainment",
-            "Shopping",
-            "Healthcare",
+            "Services",
+            "Food",
             "Other"
         ])
         cat_layout.addWidget(self.cat_label)
@@ -60,22 +61,20 @@ class ExpenseWidget(QWidget):
         date_layout.addWidget(self.date_label)
         date_layout.addWidget(self.date_input)
         
-        # Receipt upload
+        # Receipt reference
         receipt_layout = QHBoxLayout()
-        self.receipt_label = QLabel("Receipt:")
-        self.receipt_button = QPushButton("Upload Receipt")
-        self.receipt_button.clicked.connect(self.upload_receipt)
-        self.receipt_status = QLabel("No receipt uploaded")
+        self.receipt_label = QLabel("Receipt Reference:")
+        self.receipt_input = QLineEdit()
+        self.receipt_input.setPlaceholderText("Enter receipt ID from Receipts tab")
         receipt_layout.addWidget(self.receipt_label)
-        receipt_layout.addWidget(self.receipt_button)
-        receipt_layout.addWidget(self.receipt_status)
+        receipt_layout.addWidget(self.receipt_input)
         
         # Add expense button
         self.submit_button = QPushButton("Add Expense")
+        self.submit_button.setProperty("class", "success")
         self.submit_button.clicked.connect(self.add_expense)
-        self.submit_button.setStyleSheet("background-color: #4CAF50; color: white;")
         
-        # Add all layouts to form
+        # Add layouts to form
         layouts = [amount_layout, desc_layout, cat_layout, 
                   date_layout, receipt_layout]
         for layout in layouts:
@@ -83,76 +82,80 @@ class ExpenseWidget(QWidget):
         
         form_layout.addWidget(self.submit_button)
         
-        # Create a frame for the form
-        form_frame = QFrame()
-        form_frame.setLayout(form_layout)
-        form_frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        
+        # Add form frame to main layout
         main_layout.addWidget(form_frame)
         
         # Add card table
         self.expense_table = CardTable()
-        main_layout.addWidget(QLabel("Recent Expenses"))
+        table_label = QLabel("Recent Expenses")
+        table_label.setProperty("class", "section-title")
+        main_layout.addWidget(table_label)
         main_layout.addWidget(self.expense_table)
         
         self.setLayout(main_layout)
 
-    def upload_receipt(self):
-        file_name, _ = QFileDialog.getOpenFileName(
-            self,
-            "Upload Receipt",
-            "",
-            "Images (*.png *.jpg *.jpeg);;All Files (*)"
-        )
-        
-        if file_name:
-            try:
-                with Image.open(file_name) as img:
-                    # Convert to bytes
-                    img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format=img.format)
-                    self.receipt_data = img_byte_arr.getvalue()
-                    
-                self.receipt_status.setText(
-                    f"Receipt uploaded: {os.path.basename(file_name)}"
-                )
-            except Exception as e:
-                self.receipt_status.setText(f"Error uploading receipt: {str(e)}")
-                self.receipt_data = None
+    def load_expenses(self):
+        session = self.db_manager.get_session()
+        try:
+            expenses = session.query(Expense).all()
+            for expense in expenses:
+                self.add_expense_card(expense)
+        finally:
+            session.close()
 
     def add_expense(self):
         try:
-            amount = float(self.amount_input.text())
-            description = self.desc_input.text()
-            category = self.cat_input.currentText()
-            date = self.date_input.date().toPyDate()
+            # Create new session
+            session = self.db_manager.get_session()
             
-            # Create expense object (you'll need to implement database integration)
-            expense_data = {
-                'amount': amount,
-                'description': description,
-                'category': category,
-                'date': date,
-                'receipt': self.receipt_data
-            }
+            expense = Expense(
+                amount=float(self.amount_input.text()),
+                description=self.desc_input.text(),
+                category=self.cat_input.currentText(),
+                date=self.date_input.date().toPyDate()
+            )
             
-            # Add card to table
-            self.expense_table.add_card(expense_data)
-            
-            # Clear form after successful addition
-            self.clear_form()
-            
-            print(f"Added expense: {expense_data}")  # Replace with DB integration
-            
+            try:
+                session.add(expense)
+                session.commit()
+                # Get the data before closing session
+                expense_data = {
+                    'Amount': f"${expense.amount:.2f}",
+                    'Description': expense.description,
+                    'Category': expense.category,
+                    'Date': expense.date.strftime("%Y-%m-%d")
+                }
+                self.expense_table.add_card(expense_data)
+                self.clear_form()
+            except Exception as e:
+                session.rollback()
+                print(f"Error adding expense: {str(e)}")
+            finally:
+                session.close()
+                
         except ValueError:
             self.amount_input.setStyleSheet("border: 1px solid red;")
             return
+
+    def add_expense_card(self, expense):
+        # Create new session for loading expense
+        session = self.db_manager.get_session()
+        try:
+            # Merge the expense with the new session
+            expense = session.merge(expense)
+            self.expense_table.add_card({
+                'Amount': f"${expense.amount:.2f}",
+                'Description': expense.description,
+                'Category': expense.category,
+                'Date': expense.date.strftime("%Y-%m-%d")
+            })
+        finally:
+            session.close()
 
     def clear_form(self):
         self.amount_input.clear()
         self.desc_input.clear()
         self.cat_input.setCurrentIndex(0)
         self.date_input.setDate(QDate.currentDate())
-        self.receipt_data = None
-        self.receipt_status.setText("No receipt uploaded")
+        self.receipt_input.clear()
         self.amount_input.setStyleSheet("")

@@ -3,13 +3,16 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QFrame)
 from PyQt6.QtCore import Qt, QDate
 from ..models.subscription import Subscription
+from ..database.db_manager import DatabaseManager
 from .components.card_table import CardTable
 from datetime import datetime
 
 class SubscriptionWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.db_manager = DatabaseManager()
         self.init_ui()
+        self.load_subscriptions()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -71,24 +74,39 @@ class SubscriptionWidget(QWidget):
 
         self.setLayout(main_layout)
 
+    def load_subscriptions(self):
+        session = self.db_manager.get_session()
+        try:
+            subscriptions = session.query(Subscription).all()
+            for subscription in subscriptions:
+                self.add_subscription_card(subscription)
+        finally:
+            session.close()
+
     def add_subscription(self):
         try:
-            subscription_data = {
-                'name': self.name_input.text(),
-                'amount': float(self.amount_input.text()),
-                'billing_cycle': self.cycle_input.currentText(),
-                'next_billing': self.date_input.date().toPyDate()
-            }
+            subscription = Subscription(
+                name=self.name_input.text(),
+                amount=float(self.amount_input.text()),
+                billing_cycle=self.cycle_input.currentText(),
+                next_billing_date=self.date_input.date().toPyDate()
+            )
             
-            # Add to card table
-            self.subscription_table.add_card(subscription_data)
-            
-            # Clear form
-            self.clear_form()
+            if self.db_manager.add_record(subscription):
+                self.add_subscription_card(subscription)
+                self.clear_form()
             
         except ValueError:
             self.amount_input.setStyleSheet("border: 1px solid red;")
             return
+
+    def add_subscription_card(self, subscription):
+        self.subscription_table.add_card({
+            'Service': subscription.name,
+            'Amount': f"${subscription.amount:.2f}",
+            'Billing Cycle': subscription.billing_cycle,
+            'Next Billing': subscription.next_billing_date.strftime("%Y-%m-%d")
+        })
 
     def clear_form(self):
         self.name_input.clear()
