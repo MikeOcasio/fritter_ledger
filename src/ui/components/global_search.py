@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import (QWidget, QLineEdit, QListWidget, QListWidgetItem, 
-                           QVBoxLayout, QLabel, QFrame, QHBoxLayout, 
-                           QPushButton, QSizePolicy)
-from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer
-from PyQt6.QtGui import QIcon, QFont, QColor
+from PyQt6.QtWidgets import (QWidget, QLineEdit, QVBoxLayout, QLabel, QFrame, QHBoxLayout, 
+                           QPushButton, QSizePolicy, QScrollArea)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint
+from PyQt6.QtGui import QFont
 
 from ...database.db_manager import DatabaseManager
 from ...models.expense import Expense
@@ -47,6 +46,7 @@ class SearchResultItem(QFrame):
         # Main text
         main_text = QLabel(search_result.text)
         main_text.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        main_text.setStyleSheet("color: white;")
         
         # Breadcrumb text
         breadcrumb = QLabel(search_result.breadcrumb)
@@ -56,29 +56,31 @@ class SearchResultItem(QFrame):
         layout.addWidget(main_text)
         layout.addWidget(breadcrumb)
         
-        # Set background color based on result type
-        color_map = {
-            "expense": "#FFD1C1",   # Light red
-            "income": "#C1FFD7",    # Light green
-            "subscription": "#C1E1FF", # Light blue
-            "receipt": "#FFE1C1",   # Light orange
-            "client": "#E1C1FF"     # Light purple
-        }
-        
-        base_color = color_map.get(search_result.source_type.lower(), "#EEEEEE")
-        hover_color = self.lighten_color(base_color, 0.3)
+        # Set colors - dark background for all result types
+        self.base_color = "#2a2a2a"
+        self.hover_color = "#3a3a3a"
         
         # Apply color as background
-        self.base_color = base_color
-        self.hover_color = hover_color
         self.setStyleSheet(f"""
             SearchResultItem {{
-                background-color: {base_color};
+                background-color: {self.base_color};
                 border-radius: 4px;
-                color: #333333;
+                color: white;
+                border-left: 4px solid {self._get_accent_color(search_result.source_type)};
             }}
         """)
-        
+    
+    def _get_accent_color(self, source_type):
+        """Get accent color for left border based on result type"""
+        color_map = {
+            "expense": "#F44336",    # Red
+            "income": "#4CAF50",     # Green
+            "subscription": "#2196F3", # Blue
+            "receipt": "#FF9800",    # Orange
+            "client": "#9C27B0"      # Purple
+        }
+        return color_map.get(source_type.lower(), "#757575")
+    
     def lighten_color(self, hex_color, factor=0.2):
         """Lighten a hex color by a factor"""
         # Convert hex to RGB
@@ -99,7 +101,8 @@ class SearchResultItem(QFrame):
             SearchResultItem {{
                 background-color: {self.hover_color};
                 border-radius: 4px;
-                color: #333333;
+                color: white;
+                border-left: 4px solid {self._get_accent_color(self.search_result.source_type)};
             }}
         """)
         super().enterEvent(event)
@@ -110,7 +113,8 @@ class SearchResultItem(QFrame):
             SearchResultItem {{
                 background-color: {self.base_color};
                 border-radius: 4px;
-                color: #333333;
+                color: white;
+                border-left: 4px solid {self._get_accent_color(self.search_result.source_type)};
             }}
         """)
         super().leaveEvent(event)
@@ -133,7 +137,7 @@ class GlobalSearch(QWidget):
         self.search_timer.setSingleShot(True)
         self.search_timer.timeout.connect(self.perform_search)
         self.init_ui()
-        
+    
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -148,6 +152,7 @@ class GlobalSearch(QWidget):
         # Search icon or label
         search_icon = QLabel("🔍")
         search_icon.setFont(QFont("Arial", 14))
+        search_icon.setStyleSheet("color: white;")
         search_layout.addWidget(search_icon)
         
         # Search input
@@ -168,27 +173,35 @@ class GlobalSearch(QWidget):
         
         layout.addWidget(search_container)
         
-        # Results container
-        self.results_container = QWidget()
-        self.results_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.results_layout = QVBoxLayout(self.results_container)
-        self.results_layout.setContentsMargins(0, 0, 0, 0)
-        self.results_layout.setSpacing(0)
+        # Create results popup container (not in main layout)
+        self.results_container = QFrame(self.window())  # Create as child of main window
+        self.results_container.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.results_container.setObjectName("search-results-container")
+        self.results_container.setMaximumHeight(400)  # Limit height
         
-        # Results scroll area
-        self.results_list = QVBoxLayout()
-        self.results_list.setContentsMargins(0, 0, 0, 0)
+        # Results layout
+        results_layout = QVBoxLayout(self.results_container)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        results_layout.setSpacing(0)
+        
+        # Create scroll area for results
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        # Content widget for scroll area
+        scroll_content = QWidget()
+        self.results_list = QVBoxLayout(scroll_content)
+        self.results_list.setContentsMargins(10, 10, 10, 10)
         self.results_list.setSpacing(8)
-        
-        # Add a spacer so items don't stretch vertically
         self.results_list.addStretch()
         
-        self.results_layout.addLayout(self.results_list)
-        
-        layout.addWidget(self.results_container)
+        scroll_area.setWidget(scroll_content)
+        results_layout.addWidget(scroll_area)
         
         # Initially hide results
-        self.results_container.setVisible(False)
+        self.results_container.hide()
         
         # Set styling
         self.setStyleSheet("""
@@ -217,13 +230,40 @@ class GlobalSearch(QWidget):
             #search-clear-btn:hover {
                 color: white;
             }
-            
-            /* Results list styling */
-            QFrame {
-                border: none;
-            }
         """)
         
+        # Style the results container separately
+        self.results_container.setStyleSheet("""
+            #search-results-container {
+                background-color: #2a2a2a;
+                border: 1px solid #1a237e;
+                border-radius: 8px;
+            }
+            
+            QScrollArea {
+                background-color: transparent;
+            }
+            
+            QScrollBar:vertical {
+                border: none;
+                background: #3a3a3a;
+                width: 8px;
+                margin: 0px;
+            }
+            
+            QScrollBar::handle:vertical {
+                background: #1a237e;
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+        """)
+    
     def on_search_text_changed(self, text):
         """Handle search text changes with debounce"""
         # Clear the previous timer
@@ -235,7 +275,30 @@ class GlobalSearch(QWidget):
         else:
             # If text is empty, hide results immediately
             self.clear_results()
-            self.results_container.setVisible(False)
+            self.results_container.hide()
+    
+    def showEvent(self, event):
+        """Override showEvent to ensure we hide results when parent is shown"""
+        super().showEvent(event)
+        self.clear_search()
+    
+    def hideEvent(self, event):
+        """Override hideEvent to ensure popup is hidden too"""
+        self.results_container.hide()
+        super().hideEvent(event)
+    
+    def resizeEvent(self, event):
+        """Override resizeEvent to reposition popup if needed"""
+        super().resizeEvent(event)
+        if self.results_container.isVisible():
+            self.position_results_container()
+    
+    def position_results_container(self):
+        """Position the results container below the search input"""
+        # Position under the search widget
+        global_pos = self.mapToGlobal(QPoint(0, self.height()))
+        self.results_container.move(global_pos)
+        self.results_container.setFixedWidth(self.width())
     
     def perform_search(self):
         """Execute the search query"""
@@ -243,7 +306,7 @@ class GlobalSearch(QWidget):
         
         if not query or len(query) < 2:
             self.clear_results()
-            self.results_container.setVisible(False)
+            self.results_container.hide()
             return
             
         # Get results from database
@@ -252,6 +315,11 @@ class GlobalSearch(QWidget):
         # Display results
         self.display_results(results)
         
+        # Position and show results
+        self.position_results_container()
+        self.results_container.show()
+        self.results_container.raise_()
+    
     def search_database(self, query):
         """Search across all database tables for matching records"""
         results = []
@@ -469,16 +537,13 @@ class GlobalSearch(QWidget):
                 result_item = SearchResultItem(result)
                 result_item.clicked.connect(self.on_result_clicked)
                 self.results_list.insertWidget(0, result_item)
-        
-        # Show results container
-        self.results_container.setVisible(True)
     
     def clear_results(self):
         """Clear all search results"""
         # Remove all widgets except the last stretch item
         while self.results_list.count() > 1:
             item = self.results_list.itemAt(0)
-            if item.widget():
+            if item and item.widget():
                 item.widget().deleteLater()
             self.results_list.removeItem(item)
     
@@ -486,7 +551,7 @@ class GlobalSearch(QWidget):
         """Clear search input and results"""
         self.search_input.clear()
         self.clear_results()
-        self.results_container.setVisible(False)
+        self.results_container.hide()
     
     def on_result_clicked(self, result):
         """Handle click on a search result"""
