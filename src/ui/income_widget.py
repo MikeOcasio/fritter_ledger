@@ -320,3 +320,26 @@ class IncomeWidget(QWidget):
         self.amount_input.setStyleSheet("")
         self.editing_id = None
         self.add_button.setText("Add Income")
+
+    def highlight_record(self, record_id):
+        """Highlight a specific record by ID when coming from search"""
+        # Find the row with this ID
+        row_index = None
+        for row in range(self.income_table.rowCount()):
+            item_id = self.income_table.item_id_for_row(row)
+            if item_id == record_id:
+                row_index = row
+                break
+        
+        if row_index is not None:
+            # Scroll to the row
+            self.income_table.scrollToItem(self.income_table.item(row_index, 0))
+            
+            # Select the row
+            self.income_table.selectRow(row_index)
+            
+            # Flash highlight animation (implemented in ModernTable)
+            self.income_table.flash_highlight_row(row_index)
+            
+            # Load the record in edit form
+            self.edit_income(record_id)

@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QTableWidget, QTableWidgetItem, QAbstractItemView,
                            QPushButton, QHBoxLayout, QWidget, QDialog, 
                            QVBoxLayout, QTextEdit, QLabel, QHeaderView, QToolButton)
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QColor, QFont, QIcon
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QColor, QFont, QIcon, QBrush
 
 class ModernTable(QTableWidget):
     view_clicked = pyqtSignal(int)
@@ -361,3 +361,40 @@ class ModernTable(QTableWidget):
         layout.addWidget(close_btn)
         
         dialog.exec()
+    
+    def item_id_for_row(self, row):
+        """Get the ID associated with a specific row"""
+        return self.row_id_map.get(row)
+    
+    def flash_highlight_row(self, row):
+        """Highlight a row briefly with an animation to draw attention"""
+        # Save original background colors
+        original_colors = []
+        for col in range(self.columnCount()):
+            item = self.item(row, col)
+            if item:
+                original_colors.append(item.background())
+            else:
+                original_colors.append(QBrush(QColor(self.palette().base().color())))
+        
+        # Highlight color (light blue)
+        highlight_color = QColor(26, 35, 126, 100)  # Primary color with alpha
+        
+        # Apply highlight
+        for col in range(self.columnCount()):
+            item = self.item(row, col)
+            if item:
+                item.setBackground(QBrush(highlight_color))
+        
+        # Schedule restoration of original colors
+        def restore_colors():
+            if not self.isVisible():  # Skip if table is no longer visible
+                return
+            
+            for col in range(self.columnCount()):
+                item = self.item(row, col)
+                if item and col < len(original_colors):
+                    item.setBackground(original_colors[col])
+        
+        # Use a timer for the flash effect
+        QTimer.singleShot(1500, restore_colors)  # 1.5 seconds highlight

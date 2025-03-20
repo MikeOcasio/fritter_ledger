@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         # Create main widget and layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
-        self.main_layout = QVBoxLayout(main_widget)  # Changed to QVBoxLayout
+        self.main_layout = QVBoxLayout(main_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
         
@@ -43,9 +43,6 @@ class MainWindow(QMainWindow):
         
         # Header with hamburger menu and search
         header_layout = QHBoxLayout()
-        
-        # Left section: hamburger menu and title
-        left_header = QHBoxLayout()
         
         # Hamburger menu button
         self.menu_button = QToolButton()
@@ -72,18 +69,15 @@ class MainWindow(QMainWindow):
         self.page_title = QLabel("Expenses")
         self.page_title.setProperty("class", "page-title")
         
-        left_header.addWidget(self.menu_button)
-        left_header.addWidget(self.page_title)
-        left_header.addStretch()
+        # Add global search
+        self.global_search = GlobalSearch()
+        self.global_search.result_selected.connect(self.navigate_to_search_result)
+        self.global_search.setMaximumWidth(500)  # Limit width
         
-        # Right section: search bar
-        self.search_bar = GlobalSearch()
-        self.search_bar.setMaximumWidth(400)
-        self.search_bar.result_selected.connect(self.handle_search_result)
-        
-        # Add both sections to header
-        header_layout.addLayout(left_header, 1)  # Left section expands
-        header_layout.addWidget(self.search_bar)  # Right section fixed width
+        header_layout.addWidget(self.menu_button)
+        header_layout.addWidget(self.page_title)
+        header_layout.addStretch()
+        header_layout.addWidget(self.global_search)
         
         content_layout.addLayout(header_layout)
         
@@ -141,10 +135,9 @@ class MainWindow(QMainWindow):
         else:
             self.sidebar.expand()
     
-    def handle_search_result(self, tab_name, record_id):
-        """Handle when user clicks a search result"""
-        # Map tab names to their indices
-        tab_indices = {
+    def navigate_to_search_result(self, tab_name, record_id):
+        """Navigate to the appropriate tab and highlight the selected record"""
+        tab_index_map = {
             "Expenses": 0,
             "Income": 1,
             "Subscriptions": 2,
@@ -152,21 +145,14 @@ class MainWindow(QMainWindow):
             "Clients": 4
         }
         
-        # Change to the appropriate tab
-        if tab_name in tab_indices:
-            self.change_page(tab_indices[tab_name], tab_name)
+        if tab_name in tab_index_map:
+            # First switch to the tab
+            self.change_page(tab_index_map[tab_name], tab_name)
             
-            # Trigger edit on the appropriate page to focus the item
-            if tab_name == "Expenses":
-                self.expense_page.edit_expense(record_id)
-            elif tab_name == "Income":
-                self.income_page.edit_income(record_id)
-            elif tab_name == "Subscriptions":
-                self.subscription_page.edit_subscription(record_id)
-            elif tab_name == "Receipts":
-                self.receipt_page.edit_receipt(record_id)
-            elif tab_name == "Clients":
-                self.client_page.edit_client(record_id)
+            # Then highlight the record in the appropriate widget
+            current_widget = self.pages.currentWidget()
+            if hasattr(current_widget, 'highlight_record'):
+                current_widget.highlight_record(record_id)
     
     def on_period_changed(self, period_text, start_date, end_date):
         """Handle period change in the footer"""

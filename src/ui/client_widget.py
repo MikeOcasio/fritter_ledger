@@ -241,3 +241,26 @@ class ClientWidget(QWidget):
             return [(client.id, client.business_name) for client in clients]
         finally:
             session.close()
+
+    def highlight_record(self, record_id):
+        """Highlight a specific record by ID when coming from search"""
+        # Find the row with this ID
+        row_index = None
+        for row in range(self.client_table.rowCount()):
+            item_id = self.client_table.item_id_for_row(row)
+            if item_id == record_id:
+                row_index = row
+                break
+        
+        if row_index is not None:
+            # Scroll to the row
+            self.client_table.scrollToItem(self.client_table.item(row_index, 0))
+            
+            # Select the row
+            self.client_table.selectRow(row_index)
+            
+            # Flash highlight animation (implemented in ModernTable)
+            self.client_table.flash_highlight_row(row_index)
+            
+            # Load the record in edit form
+            self.edit_client(record_id)

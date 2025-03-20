@@ -305,3 +305,26 @@ class ExpenseWidget(QWidget):
         self.amount_input.setStyleSheet("")
         self.editing_id = None
         self.submit_button.setText("Add Expense")
+
+    def highlight_record(self, record_id):
+        """Highlight a specific record by ID when coming from search"""
+        # Find the row with this ID
+        row_index = None
+        for row in range(self.expense_table.rowCount()):
+            item_id = self.expense_table.item_id_for_row(row)
+            if item_id == record_id:
+                row_index = row
+                break
+        
+        if row_index is not None:
+            # Scroll to the row
+            self.expense_table.scrollToItem(self.expense_table.item(row_index, 0))
+            
+            # Select the row
+            self.expense_table.selectRow(row_index)
+            
+            # Flash highlight animation (implemented in ModernTable)
+            self.expense_table.flash_highlight_row(row_index)
+            
+            # Load the record in edit form
+            self.edit_expense(record_id)

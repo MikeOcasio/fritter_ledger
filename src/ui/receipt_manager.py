@@ -301,6 +301,32 @@ class ReceiptManager(QWidget):
             finally:
                 session.close()
 
+    def highlight_record(self, record_id):
+        """Highlight a specific record by ID when coming from search"""
+        # Find the row with this ID
+        row_index = None
+        for row in range(self.receipt_table.rowCount()):
+            item_id = self.receipt_table.item_id_for_row(row)
+            if item_id == record_id:
+                row_index = row
+                break
+        
+        if row_index is not None:
+            # Scroll to the row
+            self.receipt_table.scrollToItem(self.receipt_table.item(row_index, 0))
+            
+            # Select the row
+            self.receipt_table.selectRow(row_index)
+            
+            # Flash highlight animation (implemented in ModernTable)
+            self.receipt_table.flash_highlight_row(row_index)
+            
+            # Load the record in edit form
+            self.edit_receipt(record_id)
+            
+            # Also view the receipt
+            self.view_receipt(record_id)
+
 
 class ImageViewerDialog(QDialog):
     def __init__(self, title, image_data, parent=None):
