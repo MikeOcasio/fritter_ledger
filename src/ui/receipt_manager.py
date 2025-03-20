@@ -8,7 +8,7 @@ import io
 from datetime import datetime
 import os
 import fitz  # PyMuPDF for PDF handling
-from .components.card_table import CardTable
+from .components.modern_table import ModernTable
 from ..models.receipt import Receipt
 from ..database.db_manager import DatabaseManager
 
@@ -16,6 +16,7 @@ class ReceiptManager(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db_manager = DatabaseManager()
+        self.editing_id = None
         self.init_ui()
         self.load_receipts()
 
@@ -29,6 +30,11 @@ class ReceiptManager(QWidget):
         # Fields
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Receipt Name")
+        
+        # Add reference ID field
+        self.reference_input = QLineEdit()
+        self.reference_input.setPlaceholderText("Reference ID (optional)")
+        
         self.notes_input = QTextEdit()
         self.notes_input.setPlaceholderText("Notes")
         self.notes_input.setMaximumHeight(100)
@@ -39,33 +45,64 @@ class ReceiptManager(QWidget):
         
         upload_layout.addWidget(QLabel("Add New Receipt"))
         upload_layout.addWidget(self.name_input)
+        upload_layout.addWidget(self.reference_input)  # Add reference input
         upload_layout.addWidget(self.notes_input)
         upload_layout.addWidget(self.upload_button)
         
         # Receipt display section
-        self.receipt_table = CardTable(with_actions=True)
+        headers = ["Name", "Reference ID", "Date", "Notes"]
+        self.receipt_table = ModernTable(headers, with_actions=True)
         self.receipt_table.view_clicked.connect(self.view_receipt)
         self.receipt_table.download_clicked.connect(self.download_receipt)
+        self.receipt_table.edit_clicked.connect(self.edit_receipt)
+        self.receipt_table.delete_clicked.connect(self.delete_receipt)
         
         layout.addWidget(upload_section)
         layout.addWidget(QLabel("Stored Receipts"))
         layout.addWidget(self.receipt_table)
 
     def load_receipts(self):
+        # Clear existing table
+        self.receipt_table.clear_table()
+        
         session = self.db_manager.get_session()
         try:
             receipts = session.query(Receipt).all()
             for receipt in receipts:
-                self.add_receipt_card({
+                receipt_data = {
                     'Name': receipt.name,
+                    'Reference ID': receipt.reference_id or '-',
                     'Date': receipt.date.strftime("%Y-%m-%d %H:%M"),
-                    'Notes': receipt.notes,
+                    'Notes': receipt.notes or '-',
                     'ID': receipt.id
-                })
+                }
+                self.receipt_table.add_row(receipt_data, receipt.id)
         finally:
             session.close()
 
     def upload_receipt(self):
+        # If we're editing, just update the name, reference ID, and notes
+        if self.editing_id:
+            session = self.db_manager.get_session()
+            try:
+                receipt = session.query(Receipt).get(self.editing_id)
+                if receipt:
+                    receipt.name = self.name_input.text() or receipt.name
+                    receipt.reference_id = self.reference_input.text()
+                    receipt.notes = self.notes_input.toPlainText()
+                    
+                    session.commit()
+                    
+                    # Reset form and refresh data
+                    self.clear_form()
+                    self.load_receipts()  # This will clear and reload all cards
+                else:
+                    QMessageBox.warning(self, "Error", "Receipt not found")
+            finally:
+                session.close()
+            return
+        
+        # Otherwise handle a new upload
         file_name, _ = QFileDialog.getOpenFileName(
             self,
             "Upload Receipt",
@@ -95,6 +132,7 @@ class ReceiptManager(QWidget):
                     try:
                         receipt = Receipt(
                             name=self.name_input.text() or os.path.basename(file_name),
+                            reference_id=self.reference_input.text(),
                             notes=self.notes_input.toPlainText(),
                             image=image_data
                         )
@@ -105,13 +143,15 @@ class ReceiptManager(QWidget):
                         # Get receipt data for display
                         receipt_data = {
                             'Name': receipt.name,
+                            'Reference ID': receipt.reference_id or '-',
                             'Date': receipt.date.strftime("%Y-%m-%d %H:%M"),
-                            'Notes': receipt.notes,
+                            'Notes': receipt.notes or '-',
                             'ID': receipt.id
                         }
                         
-                        self.receipt_table.add_card(receipt_data)
-                        self.clear_form()
+                        self.clear_form()  
+                        # Add to table after clearing form to prevent duplicate UI updates
+                        self.receipt_table.add_row(receipt_data, receipt.id)
                         
                     finally:
                         session.close()
@@ -124,16 +164,20 @@ class ReceiptManager(QWidget):
 
     def clear_form(self):
         self.name_input.clear()
+        self.reference_input.clear()  # Clear reference ID
         self.notes_input.clear()
+        self.editing_id = None
+        self.upload_button.setText("Upload Receipt")
 
     def add_receipt_card(self, receipt_data):
         display_data = {
             'Name': receipt_data['Name'],
+            'Reference ID': receipt_data['Reference ID'],
             'Date': receipt_data['Date'],
             'Notes': receipt_data['Notes'],
             'ID': receipt_data['ID']  # Keep ID for reference
         }
-        self.receipt_table.add_card(display_data)
+        self.receipt_table.add_row(display_data, receipt_data['ID'])
 
     def convert_pdf_to_image(self, pdf_path):
         """Convert first page of PDF to image"""
@@ -191,6 +235,49 @@ class ReceiptManager(QWidget):
                 QMessageBox.warning(self, "Error", "Receipt image not found")
         finally:
             session.close()
+
+    def edit_receipt(self, receipt_id):
+        session = self.db_manager.get_session()
+        try:
+            receipt = session.query(Receipt).get(receipt_id)
+            if receipt:
+                # Set form fields
+                self.name_input.setText(receipt.name)
+                self.reference_input.setText(receipt.reference_id or "")  # Set reference ID
+                self.notes_input.setText(receipt.notes or "")
+                
+                # Set editing state
+                self.editing_id = receipt_id
+                self.upload_button.setText("Update Receipt")
+            else:
+                QMessageBox.warning(self, "Error", "Receipt not found")
+        finally:
+            session.close()
+
+    def delete_receipt(self, receipt_id):
+        confirm = QMessageBox.question(
+            self, 
+            "Confirm Delete",
+            "Are you sure you want to delete this receipt?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if confirm == QMessageBox.StandardButton.Yes:
+            session = self.db_manager.get_session()
+            try:
+                receipt = session.query(Receipt).get(receipt_id)
+                if receipt:
+                    session.delete(receipt)
+                    session.commit()
+                    
+                    # Refresh the table
+                    self.load_receipts()
+                    
+                    # If we were editing this record, clear the form
+                    if self.editing_id == receipt_id:
+                        self.clear_form()
+            finally:
+                session.close()
 
 
 class ImageViewerDialog(QDialog):

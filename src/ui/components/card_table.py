@@ -5,6 +5,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 class CardTable(QScrollArea):
     view_clicked = pyqtSignal(int)
     download_clicked = pyqtSignal(int)
+    edit_clicked = pyqtSignal(int)
+    delete_clicked = pyqtSignal(int)
     
     def __init__(self, with_actions=False, parent=None):
         super().__init__(parent)
@@ -28,7 +30,10 @@ class CardTable(QScrollArea):
         if self.with_actions:
             card.view_clicked.connect(self.on_view_clicked)
             card.download_clicked.connect(self.on_download_clicked)
+            card.edit_clicked.connect(self.on_edit_clicked)
+            card.delete_clicked.connect(self.on_delete_clicked)
         self.layout.addWidget(card)
+        return card
 
     def clear_cards(self):
         while self.layout.count():
@@ -41,11 +46,19 @@ class CardTable(QScrollArea):
         
     def on_download_clicked(self, item_id):
         self.download_clicked.emit(item_id)
+        
+    def on_edit_clicked(self, item_id):
+        self.edit_clicked.emit(item_id)
+        
+    def on_delete_clicked(self, item_id):
+        self.delete_clicked.emit(item_id)
 
 
 class Card(QFrame):
     view_clicked = pyqtSignal(int)
     download_clicked = pyqtSignal(int)
+    edit_clicked = pyqtSignal(int)
+    delete_clicked = pyqtSignal(int)
     
     def __init__(self, data, with_actions=False, parent=None):
         super().__init__(parent)
@@ -81,14 +94,25 @@ class Card(QFrame):
         if self.with_actions and self.item_id:
             actions_layout = QHBoxLayout()
             
-            view_btn = QPushButton("View")
-            view_btn.clicked.connect(self.on_view_clicked)
+            # For receipts, add view and download
+            if 'Date' in self.data and 'Notes' in self.data:
+                view_btn = QPushButton("View")
+                view_btn.clicked.connect(self.on_view_clicked)
+                download_btn = QPushButton("Download")
+                download_btn.clicked.connect(self.on_download_clicked)
+                actions_layout.addWidget(view_btn)
+                actions_layout.addWidget(download_btn)
             
-            download_btn = QPushButton("Download")
-            download_btn.clicked.connect(self.on_download_clicked)
+            # Common buttons for all types
+            edit_btn = QPushButton("Edit")
+            edit_btn.clicked.connect(self.on_edit_clicked)
             
-            actions_layout.addWidget(view_btn)
-            actions_layout.addWidget(download_btn)
+            delete_btn = QPushButton("Delete")
+            delete_btn.setStyleSheet("background-color: #f44336;")
+            delete_btn.clicked.connect(self.on_delete_clicked)
+            
+            actions_layout.addWidget(edit_btn)
+            actions_layout.addWidget(delete_btn)
             actions_layout.addStretch()
             
             main_layout.addLayout(actions_layout)
@@ -100,3 +124,11 @@ class Card(QFrame):
     def on_download_clicked(self):
         if self.item_id:
             self.download_clicked.emit(self.item_id)
+            
+    def on_edit_clicked(self):
+        if self.item_id:
+            self.edit_clicked.emit(self.item_id)
+            
+    def on_delete_clicked(self):
+        if self.item_id:
+            self.delete_clicked.emit(self.item_id)

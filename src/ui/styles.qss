@@ -30,13 +30,16 @@ QTabBar::tab:selected {
     background-color: #534bae;
 }
 
+/* Improve button styling */
 QPushButton {
     background-color: #1a237e;
     color: #ffffff;
     border: none;
     padding: 8px 16px;
     border-radius: 4px;
-    min-width: 80px;
+    min-width: 75px;
+    min-height: 35px;  /* Increased minimum height */
+    font-size: 13px;   /* Ensure text is readable */
 }
 
 QPushButton:hover {
@@ -49,6 +52,15 @@ QPushButton[class="success"] {
 
 QPushButton[class="success"]:hover {
     background-color: #45a049;
+}
+
+QTableWidget QPushButton {
+    padding: 6px 8px; /* Slightly smaller padding for table buttons */
+    font-size: 12px;  /* Smaller font for table buttons */
+}
+
+QTableWidget QWidget {
+    background-color: transparent; /* Make button containers transparent */
 }
 
 QLineEdit, QTextEdit, QComboBox, QDateEdit {
@@ -114,4 +126,87 @@ QDateEdit::drop-down {
     border: none;
     background-color: #1a237e;
     width: 25px;
+}
+
+/* Improve table styling */
+QTableWidget {
+    background-color: #3a3a3a;
+    color: #ffffff;
+    border: none;
+    gridline-color: #545454;
+    selection-background-color: #1a237e;
+    selection-color: #ffffff;
+}
+
+QTableWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #545454;
+    min-height: 30px;  /* Minimum row height */
+}
+
+QTableWidget::item:selected {
+    background-color: #1a237e;
+}
+
+QHeaderView::section {
+    background-color: #1a237e;
+    color: #ffffff;
+    padding: 10px 8px;  /* More padding for header */
+    border: none;
+    font-weight: bold;
+}
+
+/* Sidebar styling */
+#sidebar {
+    background-color: #1a237e;
+    min-width: 200px;
+    border: none;
+    border-radius: 0;
+}
+
+#sidebar-title {
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 20px 10px;
+}
+
+#sidebar-button {
+    background-color: transparent;
+    color: white;
+    border: none;
+    border-radius: 0;
+    text-align: left;
+    padding: 12px 15px;
+    font-size: 14px;
+}
+
+#sidebar-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#sidebar-button[active="true"] {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-left: 4px solid white;
+}
+
+.page-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: white;
+}
+
+#hamburger-button {
+    color: white;
+    background-color: transparent;
+    border: none;
+    font-size: 24px;
+    font-weight: bold;
+    padding: 8px;
+}
+
+#hamburger-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
