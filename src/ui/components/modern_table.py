@@ -9,6 +9,7 @@ class ModernTable(QTableWidget):
     download_clicked = pyqtSignal(int)
     edit_clicked = pyqtSignal(int)
     delete_clicked = pyqtSignal(int)
+    paid_clicked = pyqtSignal(int)  # New signal for marking as paid
     
     def __init__(self, headers, with_actions=False, parent=None):
         super().__init__(parent)
@@ -219,6 +220,9 @@ class ModernTable(QTableWidget):
             # Check if this is a receipt (has view/download)
             is_receipt = 'Date' in data and 'Notes' in data
             
+            # Check if this is a subscription (has "Billing Cycle")
+            is_subscription = 'Billing Cycle' in data
+            
             if is_receipt:
                 # Eye icon for view
                 view_btn = self.create_icon_button(
@@ -236,6 +240,15 @@ class ModernTable(QTableWidget):
                 
                 action_layout.addWidget(view_btn)
                 action_layout.addWidget(download_btn)
+            
+            # If this is a subscription, add a "Mark as Paid" button
+            if is_subscription:
+                paid_btn = self.create_icon_button(
+                    "Mark as Paid", 
+                    "✓", 
+                    lambda _, r=row_position: self.on_paid_clicked(r)
+                )
+                action_layout.addWidget(paid_btn)
             
             # Pencil icon for edit
             edit_btn = self.create_icon_button(
@@ -260,7 +273,7 @@ class ModernTable(QTableWidget):
             self.setCellWidget(row_position, len(self.headers), action_widget)
             
             # Set fixed width for actions column - smaller with icons
-            action_width = 200 if is_receipt else 120
+            action_width = 250 if (is_receipt or is_subscription) else 120
             self.setColumnWidth(len(self.headers), action_width)
         
         # Adjust row height to accommodate buttons
@@ -300,6 +313,12 @@ class ModernTable(QTableWidget):
         item_id = self.row_id_map.get(row)
         if item_id is not None:
             self.delete_clicked.emit(item_id)
+            
+    def on_paid_clicked(self, row):
+        """Handle click on the "Mark as Paid" button"""
+        item_id = self.row_id_map.get(row)
+        if item_id is not None:
+            self.paid_clicked.emit(item_id)
             
     def on_cell_double_clicked(self, row, column):
         """Handle double-click on a cell to show full description/notes"""

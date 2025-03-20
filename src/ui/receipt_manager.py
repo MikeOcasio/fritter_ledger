@@ -11,11 +11,13 @@ import fitz  # PyMuPDF for PDF handling
 from .components.modern_table import ModernTable
 from ..models.receipt import Receipt
 from ..database.db_manager import DatabaseManager
+from ..utils.reference_manager import ReferenceManager  # Import our new reference manager
 
 class ReceiptManager(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.db_manager = DatabaseManager()
+        self.reference_manager = ReferenceManager()  # Add reference manager
         self.editing_id = None
         self.init_ui()
         self.load_receipts()
@@ -31,9 +33,15 @@ class ReceiptManager(QWidget):
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Receipt Name")
         
-        # Add reference ID field
+        # Reference ID field (readonly, will be auto-generated)
+        reference_layout = QHBoxLayout()
+        reference_label = QLabel("Reference ID:")
         self.reference_input = QLineEdit()
-        self.reference_input.setPlaceholderText("Reference ID (optional)")
+        self.reference_input.setPlaceholderText("Auto-generated")
+        self.reference_input.setReadOnly(True)  # Make it read-only
+        self.reference_input.setStyleSheet("background-color: #333333;")  # Darker background to indicate readonly
+        reference_layout.addWidget(reference_label)
+        reference_layout.addWidget(self.reference_input)
         
         self.notes_input = QTextEdit()
         self.notes_input.setPlaceholderText("Notes")
@@ -45,7 +53,7 @@ class ReceiptManager(QWidget):
         
         upload_layout.addWidget(QLabel("Add New Receipt"))
         upload_layout.addWidget(self.name_input)
-        upload_layout.addWidget(self.reference_input)  # Add reference input
+        upload_layout.addLayout(reference_layout)  # Add reference ID field
         upload_layout.addWidget(self.notes_input)
         upload_layout.addWidget(self.upload_button)
         
@@ -60,6 +68,15 @@ class ReceiptManager(QWidget):
         layout.addWidget(upload_section)
         layout.addWidget(QLabel("Stored Receipts"))
         layout.addWidget(self.receipt_table)
+        
+        # Set initial auto-generated reference ID
+        self.update_reference_id()
+
+    def update_reference_id(self):
+        """Update the reference ID field with a new auto-generated ID"""
+        if not self.editing_id:  # Only generate new ID when not editing
+            new_reference = self.reference_manager.get_next_receipt_reference()
+            self.reference_input.setText(new_reference)
 
     def load_receipts(self):
         # Clear existing table
@@ -88,7 +105,7 @@ class ReceiptManager(QWidget):
                 receipt = session.query(Receipt).get(self.editing_id)
                 if receipt:
                     receipt.name = self.name_input.text() or receipt.name
-                    receipt.reference_id = self.reference_input.text()
+                    # Don't update reference_id when editing, keep the original
                     receipt.notes = self.notes_input.toPlainText()
                     
                     session.commit()
@@ -130,9 +147,12 @@ class ReceiptManager(QWidget):
                     # Create a new session
                     session = self.db_manager.get_session()
                     try:
+                        # Get the auto-generated reference ID
+                        reference_id = self.reference_input.text()
+                        
                         receipt = Receipt(
                             name=self.name_input.text() or os.path.basename(file_name),
-                            reference_id=self.reference_input.text(),
+                            reference_id=reference_id,  # Use the auto-generated ID
                             notes=self.notes_input.toPlainText(),
                             image=image_data
                         )
@@ -143,7 +163,7 @@ class ReceiptManager(QWidget):
                         # Get receipt data for display
                         receipt_data = {
                             'Name': receipt.name,
-                            'Reference ID': receipt.reference_id or '-',
+                            'Reference ID': receipt.reference_id,
                             'Date': receipt.date.strftime("%Y-%m-%d %H:%M"),
                             'Notes': receipt.notes or '-',
                             'ID': receipt.id
@@ -164,10 +184,12 @@ class ReceiptManager(QWidget):
 
     def clear_form(self):
         self.name_input.clear()
-        self.reference_input.clear()  # Clear reference ID
         self.notes_input.clear()
         self.editing_id = None
         self.upload_button.setText("Upload Receipt")
+        
+        # Generate a new reference ID
+        self.update_reference_id()
 
     def add_receipt_card(self, receipt_data):
         display_data = {

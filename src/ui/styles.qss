@@ -210,3 +210,71 @@ QHeaderView::section {
     background-color: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
 }
+
+/* Footer styling */
+#summary-footer {
+    background-color: #1a237e;
+    color: white;
+    border-top: 1px solid #534bae;
+    padding: 5px 15px;
+}
+
+#summary-footer QLabel {
+    color: white;
+    font-size: 13px;
+}
+
+#summary-footer QComboBox {
+    background-color: #534bae;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    min-width: 120px;
+}
+
+#summary-footer QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+#summary-footer QPushButton {
+    background-color: #534bae;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px;
+    min-width: 40px;
+    min-height: 25px;
+}
+
+#summary-footer QPushButton:hover {
+    background-color: #666ad1;
+}
+
+/* Global search styling */
+#search-container {
+    background-color: #3a3a3a;
+    border-radius: 20px;
+    border: 1px solid #534bae;
+}
+
+GlobalSearch QLineEdit {
+    background-color: transparent;
+    border: none;
+    color: white;
+    font-size: 14px;
+}
+
+GlobalSearch QWidget {
+    background-color: #2b2b2b;
+}
+
+SearchResultItem {
+    border-radius: 4px;
+    padding: 8px;
+}
+
+SearchResultItem QLabel {
+    color: #333333;
+}

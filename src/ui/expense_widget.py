@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, QDate
 from datetime import datetime
 from .components.card_table import CardTable
 from ..models.expense import Expense
+from ..models.receipt import Receipt
 from ..database.db_manager import DatabaseManager
 from .components.modern_table import ModernTable
 
@@ -63,13 +64,22 @@ class ExpenseWidget(QWidget):
         date_layout.addWidget(self.date_label)
         date_layout.addWidget(self.date_input)
         
-        # Receipt reference
+        # Receipt reference dropdown
         receipt_layout = QHBoxLayout()
         self.receipt_label = QLabel("Receipt Reference:")
-        self.receipt_input = QLineEdit()
-        self.receipt_input.setPlaceholderText("Enter receipt ID from Receipts tab")
+        self.receipt_input = QComboBox()  # Changed to combobox for dropdown
+        self.receipt_input.setEditable(True)  # Allow typing for search
+        self.receipt_input.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)  # Don't add new items
+        self.receipt_input.setPlaceholderText("Select a receipt reference")
         receipt_layout.addWidget(self.receipt_label)
         receipt_layout.addWidget(self.receipt_input)
+        
+        # Refresh button for receipt references
+        self.refresh_receipts_btn = QPushButton("↻")
+        self.refresh_receipts_btn.setToolTip("Refresh receipt list")
+        self.refresh_receipts_btn.setFixedWidth(30)
+        self.refresh_receipts_btn.clicked.connect(self.populate_receipt_references)
+        receipt_layout.addWidget(self.refresh_receipts_btn)
         
         # Add expense button
         self.submit_button = QPushButton("Add Expense")
@@ -88,7 +98,7 @@ class ExpenseWidget(QWidget):
         main_layout.addWidget(form_frame)
         
         # Add table
-        headers = ["Amount", "Description", "Category", "Date"]
+        headers = ["Amount", "Description", "Category", "Receipt Ref", "Date"]
         self.expense_table = ModernTable(headers, with_actions=True)
         self.expense_table.edit_clicked.connect(self.edit_expense)
         self.expense_table.delete_clicked.connect(self.delete_expense)
@@ -98,6 +108,39 @@ class ExpenseWidget(QWidget):
         main_layout.addWidget(self.expense_table)
         
         self.setLayout(main_layout)
+        
+        # Populate receipt references
+        self.populate_receipt_references()
+
+    def populate_receipt_references(self):
+        """Load all receipt references into the dropdown"""
+        # Save current text if any
+        current_text = self.receipt_input.currentText()
+        
+        # Clear existing items
+        self.receipt_input.clear()
+        
+        # Add empty option first
+        self.receipt_input.addItem("", None)
+        
+        session = self.db_manager.get_session()
+        try:
+            # Get all receipts ordered by most recent first
+            receipts = session.query(Receipt).order_by(Receipt.date.desc()).all()
+            
+            for receipt in receipts:
+                if receipt.reference_id:
+                    display_text = f"{receipt.reference_id} - {receipt.name}"
+                    self.receipt_input.addItem(display_text, receipt.reference_id)
+            
+            # Try to restore previous selection
+            if current_text:
+                index = self.receipt_input.findText(current_text, Qt.MatchFlag.MatchContains)
+                if index >= 0:
+                    self.receipt_input.setCurrentIndex(index)
+                
+        finally:
+            session.close()
 
     def load_expenses(self):
         session = self.db_manager.get_session()
@@ -112,6 +155,7 @@ class ExpenseWidget(QWidget):
                     'Amount': f"${expense.amount:.2f}",
                     'Description': expense.description,
                     'Category': expense.category,
+                    'Receipt Ref': expense.receipt_reference or '-',  # Display receipt reference
                     'Date': expense.date.strftime("%Y-%m-%d"),
                     'ID': expense.id
                 }
@@ -126,6 +170,15 @@ class ExpenseWidget(QWidget):
             category = self.cat_input.currentText()
             date = self.date_input.date().toPyDate()
             
+            # Get receipt reference from dropdown
+            receipt_ref = None
+            if self.receipt_input.currentIndex() > 0:  # If not the empty selection
+                receipt_ref = self.receipt_input.currentData()
+                if not receipt_ref:  # If data isn't set but text is entered, try to parse
+                    text = self.receipt_input.currentText()
+                    if " - " in text:
+                        receipt_ref = text.split(" - ")[0].strip()
+            
             session = self.db_manager.get_session()
             
             try:
@@ -136,6 +189,7 @@ class ExpenseWidget(QWidget):
                         expense.description = description
                         expense.category = category
                         expense.date = date
+                        expense.receipt_reference = receipt_ref  # Update receipt reference
                         
                         # Update display
                         session.commit()
@@ -150,20 +204,23 @@ class ExpenseWidget(QWidget):
                         amount=amount,
                         description=description,
                         category=category,
-                        date=date
+                        date=date,
+                        receipt_reference=receipt_ref  # Set receipt reference
                     )
                     
                     session.add(expense)
                     session.commit()
                     
-                    # Add to display directly
-                    self.expense_table.add_card({
+                    # Add to display
+                    expense_data = {
                         'Amount': f"${expense.amount:.2f}",
                         'Description': expense.description,
                         'Category': expense.category,
+                        'Receipt Ref': expense.receipt_reference or '-',
                         'Date': expense.date.strftime("%Y-%m-%d"),
                         'ID': expense.id
-                    })
+                    }
+                    self.expense_table.add_row(expense_data, expense.id)
                     
                     self.clear_form()
             finally:
@@ -184,7 +241,24 @@ class ExpenseWidget(QWidget):
                 index = self.cat_input.findText(expense.category)
                 if index >= 0:
                     self.cat_input.setCurrentIndex(index)
+                
+                # Set receipt reference dropdown
+                if expense.receipt_reference:
+                    ref_index = -1
+                    for i in range(self.receipt_input.count()):
+                        if self.receipt_input.itemData(i) == expense.receipt_reference:
+                            ref_index = i
+                            break
                     
+                    if ref_index >= 0:
+                        self.receipt_input.setCurrentIndex(ref_index)
+                    else:
+                        # If not found, add it to the dropdown
+                        self.receipt_input.addItem(expense.receipt_reference, expense.receipt_reference)
+                        self.receipt_input.setCurrentIndex(self.receipt_input.count() - 1)
+                else:
+                    self.receipt_input.setCurrentIndex(0)  # Empty selection
+                
                 # Set date
                 date = QDate(expense.date.year, expense.date.month, expense.date.day)
                 self.date_input.setDate(date)
@@ -222,28 +296,12 @@ class ExpenseWidget(QWidget):
             finally:
                 session.close()
 
-    def add_expense_card(self, expense):
-        # Create new session for loading expense
-        session = self.db_manager.get_session()
-        try:
-            # Merge the expense with the new session
-            expense = session.merge(expense)
-            self.expense_table.add_card({
-                'Amount': f"${expense.amount:.2f}",
-                'Description': expense.description,
-                'Category': expense.category,
-                'Date': expense.date.strftime("%Y-%m-%d"),
-                'ID': expense.id
-            })
-        finally:
-            session.close()
-
     def clear_form(self):
         self.amount_input.clear()
         self.desc_input.clear()
         self.cat_input.setCurrentIndex(0)
         self.date_input.setDate(QDate.currentDate())
-        self.receipt_input.clear()
+        self.receipt_input.setCurrentIndex(0)  # Reset to empty selection
         self.amount_input.setStyleSheet("")
         self.editing_id = None
         self.submit_button.setText("Add Expense")

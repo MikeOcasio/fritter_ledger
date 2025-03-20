@@ -9,6 +9,8 @@ from .income_widget import IncomeWidget
 from .subscription_widget import SubscriptionWidget
 from .receipt_manager import ReceiptManager
 from .client_widget import ClientWidget
+from .components.summary_footer import SummaryFooter
+from .components.global_search import GlobalSearch
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -20,22 +22,30 @@ class MainWindow(QMainWindow):
         # Create main widget and layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
-        self.main_layout = QHBoxLayout(main_widget)
+        self.main_layout = QVBoxLayout(main_widget)  # Changed to QVBoxLayout
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
+        
+        # Create horizontal layout for sidebar and content
+        horizontal_layout = QHBoxLayout()
+        horizontal_layout.setContentsMargins(0, 0, 0, 0)
+        horizontal_layout.setSpacing(0)
         
         # Create and add sidebar
         self.sidebar = CollapsibleSidebar()
         self.sidebar.button_clicked.connect(self.change_page)
-        self.main_layout.addWidget(self.sidebar)
+        horizontal_layout.addWidget(self.sidebar)
         
         # Create and add content area
         self.content_container = QWidget()
         content_layout = QVBoxLayout(self.content_container)
         content_layout.setContentsMargins(15, 15, 15, 15)
         
-        # Header with hamburger menu
+        # Header with hamburger menu and search
         header_layout = QHBoxLayout()
+        
+        # Left section: hamburger menu and title
+        left_header = QHBoxLayout()
         
         # Hamburger menu button
         self.menu_button = QToolButton()
@@ -62,9 +72,18 @@ class MainWindow(QMainWindow):
         self.page_title = QLabel("Expenses")
         self.page_title.setProperty("class", "page-title")
         
-        header_layout.addWidget(self.menu_button)
-        header_layout.addWidget(self.page_title)
-        header_layout.addStretch()
+        left_header.addWidget(self.menu_button)
+        left_header.addWidget(self.page_title)
+        left_header.addStretch()
+        
+        # Right section: search bar
+        self.search_bar = GlobalSearch()
+        self.search_bar.setMaximumWidth(400)
+        self.search_bar.result_selected.connect(self.handle_search_result)
+        
+        # Add both sections to header
+        header_layout.addLayout(left_header, 1)  # Left section expands
+        header_layout.addWidget(self.search_bar)  # Right section fixed width
         
         content_layout.addLayout(header_layout)
         
@@ -87,8 +106,16 @@ class MainWindow(QMainWindow):
         # Add pages to content layout
         content_layout.addWidget(self.pages)
         
-        # Add content container to main layout
-        self.main_layout.addWidget(self.content_container)
+        # Add content container to horizontal layout
+        horizontal_layout.addWidget(self.content_container)
+        
+        # Add horizontal layout to main layout
+        self.main_layout.addLayout(horizontal_layout, 1)  # Give it stretch factor
+        
+        # Add summary footer
+        self.footer = SummaryFooter()
+        self.footer.period_changed.connect(self.on_period_changed)
+        self.main_layout.addWidget(self.footer)
         
         # Initially collapse sidebar
         QApplication.processEvents()  # Process events to ensure UI is built
@@ -113,6 +140,38 @@ class MainWindow(QMainWindow):
             self.sidebar.collapse()
         else:
             self.sidebar.expand()
+    
+    def handle_search_result(self, tab_name, record_id):
+        """Handle when user clicks a search result"""
+        # Map tab names to their indices
+        tab_indices = {
+            "Expenses": 0,
+            "Income": 1,
+            "Subscriptions": 2,
+            "Receipts": 3,
+            "Clients": 4
+        }
+        
+        # Change to the appropriate tab
+        if tab_name in tab_indices:
+            self.change_page(tab_indices[tab_name], tab_name)
+            
+            # Trigger edit on the appropriate page to focus the item
+            if tab_name == "Expenses":
+                self.expense_page.edit_expense(record_id)
+            elif tab_name == "Income":
+                self.income_page.edit_income(record_id)
+            elif tab_name == "Subscriptions":
+                self.subscription_page.edit_subscription(record_id)
+            elif tab_name == "Receipts":
+                self.receipt_page.edit_receipt(record_id)
+            elif tab_name == "Clients":
+                self.client_page.edit_client(record_id)
+    
+    def on_period_changed(self, period_text, start_date, end_date):
+        """Handle period change in the footer"""
+        # This could be used to update the current view with filtered data
+        print(f"Period changed to {period_text}: {start_date} to {end_date}")
     
     def resizeEvent(self, event):
         """Handle window resize events"""

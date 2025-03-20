@@ -1,10 +1,12 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                            QLineEdit, QPushButton, QComboBox, QDateEdit,
-                           QFrame, QMessageBox)
-from PyQt6.QtCore import Qt, QDate
+                           QFrame, QMessageBox, QToolButton)
+from PyQt6.QtCore import Qt, QDate, QSize
+from PyQt6.QtGui import QIcon, QFont
 from ..models.subscription import Subscription
 from ..database.db_manager import DatabaseManager
 from .components.modern_table import ModernTable
+from .components.subscription_calendar import SubscriptionCalendarDialog  # Import our new component
 from datetime import datetime
 
 class SubscriptionWidget(QWidget):
@@ -42,7 +44,7 @@ class SubscriptionWidget(QWidget):
         cycle_layout = QHBoxLayout()
         self.cycle_label = QLabel("Billing Cycle:")
         self.cycle_input = QComboBox()
-        self.cycle_input.addItems(["Monthly", "Yearly", "Quarterly"])
+        self.cycle_input.addItems(["Monthly", "Quarterly", "Yearly"])
         cycle_layout.addWidget(self.cycle_label)
         cycle_layout.addWidget(self.cycle_input)
 
@@ -68,15 +70,35 @@ class SubscriptionWidget(QWidget):
         # Add form frame to main layout
         main_layout.addWidget(form_frame)
 
+        # Table header with calendar button
+        table_header = QHBoxLayout()
+        active_subs_label = QLabel("Active Subscriptions")
+        active_subs_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        table_header.addWidget(active_subs_label)
+        
+        table_header.addStretch()
+        
+        # Add calendar button
+        self.calendar_button = QPushButton("📅 View Calendar")
+        self.calendar_button.setToolTip("View subscriptions in calendar view")
+        self.calendar_button.clicked.connect(self.show_calendar)
+        table_header.addWidget(self.calendar_button)
+        
+        main_layout.addLayout(table_header)
+
         # Add table
         headers = ["Service", "Amount", "Billing Cycle", "Next Billing"]
         self.subscription_table = ModernTable(headers, with_actions=True)
         self.subscription_table.edit_clicked.connect(self.edit_subscription)
         self.subscription_table.delete_clicked.connect(self.delete_subscription)
-        main_layout.addWidget(QLabel("Active Subscriptions"))
         main_layout.addWidget(self.subscription_table)
 
         self.setLayout(main_layout)
+
+    def show_calendar(self):
+        """Show the subscription calendar dialog"""
+        calendar_dialog = SubscriptionCalendarDialog(self)
+        calendar_dialog.exec()
 
     def load_subscriptions(self):
         session = self.db_manager.get_session()

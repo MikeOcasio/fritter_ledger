@@ -106,7 +106,40 @@ def add_clients_table():
         else:
             print("Clients table already exists.")
 
+def add_receipt_reference_to_expenses():
+    # Load config
+    config = configparser.ConfigParser()
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.ini')
+    config.read(config_path)
+    
+    # Create database connection
+    db_url = f"postgresql://{config['Database']['user']}:{config['Database']['password']}@{config['Database']['host']}:{config['Database']['port']}/{config['Database']['dbname']}"
+    engine = create_engine(db_url)
+    
+    # Create metadata and reflect existing table
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+    
+    # Check if the expenses table exists
+    if 'expenses' in metadata.tables:
+        expenses = metadata.tables['expenses']
+        
+        # Check if the receipt_reference column exists
+        if 'receipt_reference' not in expenses.columns:
+            print("Adding receipt_reference column to expenses table...")
+            
+            # Execute ALTER TABLE command using a transaction
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE expenses ADD COLUMN receipt_reference VARCHAR;"))
+                
+            print("Column added successfully!")
+        else:
+            print("receipt_reference column already exists.")
+    else:
+        print("expenses table does not exist.")
+
 if __name__ == "__main__":
     add_reference_id_to_receipts()
     add_fields_to_income()
     add_clients_table()
+    add_receipt_reference_to_expenses()
